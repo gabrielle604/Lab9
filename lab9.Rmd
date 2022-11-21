@@ -112,3 +112,48 @@ scatter_m2a <- ggplot(IDH, aes(x = per_disturbance, y = species_richness)) +
 scatter_m2a
 ```
 
+
+### Using lubridate to deal with time series data
+
+```{r}
+dt <- "2022-11-21 12:30:05 UTC"
+# this is a string; not reading as numeric
+
+is.numeric(dt)
+```
+
+```{r}
+dt_mod <- ymd_hms(dt)
+# it is defining the data we are looking at... year, month, day _ hour, minute, second
+
+year(dt_mod)
+```
+
+- gives you a decimal for your time series (how close to the end of one full year are you? Dec 31 would be super close to 1, but not quite) >>> then you can make pretty graphs just with the decimal
+
+```{r}
+decimal_date(dt_mod)
+```
+
+
+### Application: Sedgwick bird biodiversity using eBIRD
+
+Here are the observed and estimated bird species richness for 2021 at Sedgwick Natural Reserve
+
+```{r include=TRUE, results=TRUE}
+birds_2021$date<-mdy(birds_2021$date)
+# notice the data set now has date as a Date identified!
+# make a new value for date using month, day, year >>> use lubridate to make it numeric
+
+# This code will make the decimal date from the date, which is easy to plot
+birds_2021$ddate<-decimal_date(birds_2021$date)
+# notice the ddata is a numeric! This is easy to plot
+
+ts_sedgwick_birds<- ggplot(birds_2021, aes(x=ddate, y=s_obs)) +geom_point() +
+  labs(x="Decimal date (2021)", y="Observed species richness")  +ylim(0,200)+ theme_bw()
+
+ts_sedgwick_birds
+
+```
+
+
