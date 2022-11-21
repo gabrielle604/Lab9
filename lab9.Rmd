@@ -18,22 +18,97 @@ library(knitr) # used to make table
 library(lubridate)
 ```
 
-## R Markdown
+Start by importing this IDH data. There are two variables. The variable per_disturbance is a manipulated percent of disturbance of a landscape. The species_richness variable is the number of unique species found at each manipulated disturbance patch.
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
+IDH <- read_csv(here("data","IDH.csv"))
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+birds_2021 <- read_csv(here("data","Sedgwick_2021_ebird_obs_mod.csv"))
 
-```{r cars}
-summary(cars)
 ```
 
-## Including Plots
+Let us plot the raw data:
 
-You can also embed plots, for example:
+```{r, results=TRUE}
+scatter<- ggplot(IDH, aes(x=per_disturbance, y=species_richness)) +geom_point() +
+  labs(x="Disturbance (%)", y="Species richness") + xlim(0,100) +ylim(0,25)+ theme_bw()
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+scatter
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+### Models
+While we know the data are not linear, we may consider some linear models and some non-linear polynomial models.
+
+m_0: There is no relationship between species richness and disturbance (mean only model)
+
+m_1: There is a linear relationship between species richness and disturbance (simple linear regression). We know from visual inspection this is not a good model.$y=b_0 + b_1 x$
+
+m_2a: a 2nd order polynomial with 
+intercept at 0.  $y=b_1 x + b_2 x^2$
+
+m_2b: a 2nd order polynomial with estimated intercept. $y=b_0 + b_1 x + b_2 x^2$
+
+m_3: a 3rd order polynomial with estimated intercept. $y=b_0 + b_1 x + b_2 x^2 + b_3 x^3$
+
+
+Let us program a suite of models to consider.
+
+
+
+#### models of polynomial fit
+```{r}
+m_0 <- lm(species_richness ~ 1, data=IDH) # mean only model
+
+m_1 <- lm(species_richness ~ per_disturbance, data=IDH) # Simple linear regression
+
+m_2a <- lm(species_richness ~ -1 + per_disturbance + I(per_disturbance^2), data=IDH) # 2nd degree polynomial no constant (intercept)
+## I = "as is" command
+## run a command without actually changing or adding a variable to the data set
+
+m_2a <- lm(species_richness ~ -1 + per_disturbance + I(per_disturbance^2), data=IDH)
+
+m_2b <- lm(species_richness ~ per_disturbance + I(per_disturbance^2), data=IDH)
+
+m_3 <- lm(species_richness ~ per_disturbance + I(per_disturbance^2) + I(per_disturbance^3), data=IDH)
+
+
+```
+
+- inspect the coefficients 
+- apply same inspection tools used for linear regression to the polynomial regression
+
+This makes a nice table of the model name, followed by useful statistics for model selection
+```{r}
+BIC_list <- c(BIC(m_0), BIC(m_1), BIC(m_2a), BIC(m_2b), BIC(m_3))
+
+model_output <-rbind(data.frame(glance(m_0)),data.frame(glance(m_1)),data.frame(glance(m_2a)),data.frame(glance(m_2b)), data.frame(glance(m_3))) %>% select(BIC) 
+
+model_output <- mutate(model_output, delta.BIC = BIC-min(BIC_list))
+model_output$model<-c("Model 0", "Model 1","Model 2a","Model 2b", "Model 3")
+model_output<-model_output[,c("model", "BIC", "delta.BIC" )]
+
+
+kable(model_output, format = "markdown", digits = 3, caption = "BIC, and Delta.BIC for the IDF models. Delta BIC > 7 indicates models that should be dismissed from further consideration.")
+```
+- the lowest BIC of the list is the BEST
+  - MODEL 2a is the best
+  
+
+
+Graphic of data and model
+```{r, results = TRUE}
+scatter_m2a <- ggplot(IDH, aes(x = per_disturbance, y = species_richness)) + 
+  geom_point() +
+  labs(x = "Disturbance (%)", y = "Species richness") +
+  xlim(0,100) +
+  ylim (-5,25) +
+  theme_minimal() +
+  stat_smooth(method = "lm", formula = y ~ -1 + x + I(x^2), se = FALSE)
+
+# the -1 is saying to drop the intercept
+# this is the 
+
+scatter_m2a
+```
+
