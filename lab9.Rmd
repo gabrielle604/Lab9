@@ -149,8 +149,11 @@ birds_2021$date<-mdy(birds_2021$date)
 birds_2021$ddate<-decimal_date(birds_2021$date)
 # notice the ddata is a numeric! This is easy to plot
 
-ts_sedgwick_birds<- ggplot(birds_2021, aes(x=ddate, y=s_obs)) +geom_point() +
-  labs(x="Decimal date (2021)", y="Observed species richness")  +ylim(0,200)+ theme_bw()
+ts_sedgwick_birds<- ggplot(birds_2021, aes(x=ddate, y=s_obs)) +
+  geom_point() +
+  labs(x="Decimal date (2021)", y="Observed species richness")  +
+  ylim(0,200) + 
+  theme_minimal()
 
 ts_sedgwick_birds
 
