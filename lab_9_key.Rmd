@@ -1,0 +1,186 @@
+---
+title: "Lab_9"
+author: "C.L. Jerde"
+date: "2022-11-20"
+output:   
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE, results=FALSE)
+library(tidyverse)
+library(here)
+library(ggpubr) # for some graphic applications that extend ggplot2
+library(janitor)
+library(broom) # used to make tables
+library(knitr) # used to make table
+library(lubridate)
+```
+
+# Lab 9: Polynomial Regression, Time series, and package `lubridate`
+
+**Set up an R project** and load up the IDH.csv and Sedgwick_2021_ebird_obs_mod.csv data. You will need to add the package `lubridate`. You should also set up code folding for practice and set the default options of your chunks to `echo= TRUE`, `message=FALSE`, `warning = FALSE`, `results = FALSE` and then we will modify them for each chunk as we need different information displayed. This is practice for making a professional looking document. Look at the difference between this lab's .RMD file and the .HTML file.
+
+**This week we will:** 1. Explore polynomial regression using `lm()` and BIC output 2. Explore the `lubridate` package 3. Plot some time series
+
+### Exploring polynomial regression
+
+Not all hypotheses are linear. For example, in 1978 Joseph Connell proposed the Intermediate Disturbance Hypothesis (IDH) [PDF](http://ecoevo.wdfiles.com/local--files/start/Connell1978.pdf). The idea is that with no or little disturbance, the number of unique species will be small through competitive exclusion. Similarly with high disturbance, species richness (number of unique species) will also be low, owing to the adaptation of a few species that can colonize spaces shortly after a disturbance. However, at intermediate disturbance levels, more species will be present that represent communities of early colonizers and those species that can eventually out compete the others for resources. Conceptually, would would expect a parabola type of form if we drew biodiversity or species richness on the y axis and disturbance on the x axis.
+
+![The IDH explained graphically.](https://ars.els-cdn.com/content/image/3-s2.0-B978012809665909813X-f09813-04-9780128096659.jpg)
+
+Start by importing this IDH data. There are two variables. The variable per_disturbance is a manipulated percent of disturbance of a landscape. The species_richness variable is the number of unique species found at each manipulated disturbance patch.
+
+```{r}
+IDH <- read_csv(here("data","IDH.csv"))
+```
+
+Let us plot the raw data:
+
+```{r, results=TRUE}
+scatter<- ggplot(IDH, aes(x=per_disturbance, y=species_richness)) +geom_point() +
+  labs(x="Disturbance (%)", y="Species richness") + xlim(0,100) +ylim(0,25)+ theme_bw()
+
+scatter
+```
+
+When we began thinking about testing hypotheses, we have largely focused on means or linear regression trends. However, inspection of the data lead us to realize the response is not linear. We may want to assess the trend or pattern of the response to the explanatory variable. One way to do this is polynomial regression:
+
+### Models
+While we know the data are not linear, we may consider some linear models and some non-linear polynomial models.
+
+m_0: There is no relationship between species richness and disturbance (mean only model)
+
+m_1: There is a linear relationship between species richness and disturbance (simple linear regression). We know from visual inspection this is not a good model.$y=b_0 + b_1 x$
+
+m_2a: a 2nd order polynomial with 
+intercept at 0.  $y=b_1 x + b_2 x^2$
+
+m_2b: a 2nd order polynomial with estimated intercept. $y=b_0 + b_1 x + b_2 x^2$
+
+m_3: a 3rd order polynomial with estimated intercept. $y=b_0 + b_1 x + b_2 x^2 + b_3 x^3$
+
+
+Let us program a suite of models to consider.
+```{r, results=TRUE}
+m_0 <- lm(species_richness ~ 1, data=IDH) # mean only model
+m_1 <- lm(species_richness ~ per_disturbance, data=IDH) # Simple linear regression
+m_2a <- lm(species_richness ~ -1 + per_disturbance + I(per_disturbance^2), data=IDH) # 2nd degree polynomial no constant (intercept)
+m_2b <- lm(species_richness ~ per_disturbance + I(per_disturbance^2), data=IDH) # 2nd degree polynomial with intercept
+m_3<- lm(species_richness ~ -1 + per_disturbance + I(per_disturbance^2) + I(per_disturbance^3), data=IDH) # 3nd degree polynomial no constant (intercept)
+
+#summary(m_0)
+#summary(m_1)
+#summary(m_2a)
+#summary(m_2b)
+#summary(m_3)
+
+# make table for model selection
+BIC_list<-c(BIC(m_0),BIC(m_1),BIC(m_2a),BIC(m_2b),BIC(m_3))
+
+model_output <-rbind(data.frame(glance(m_0)),data.frame(glance(m_1)),data.frame(glance(m_2a)),data.frame(glance(m_2b)), data.frame(glance(m_3))) %>% select(BIC) 
+
+model_output <- mutate(model_output, delta.BIC = BIC-min(BIC_list))
+model_output$model<-c("Model 0", "Model 1","Model 2a","Model 2b", "Model 3")
+model_output<-model_output[,c("model", "BIC", "delta.BIC" )]
+
+#this makes a nice table of the model name, followed by some useful statistics for model selection.
+kable(model_output, format = "markdown", digits = 3,caption = "BIC, and Delta.BIC for the IDH models. Delta BIC > 7 indicates models that should be dismissed from further consideration.")
+
+```
+
+What is the best model? 
+
+Let us inspect the output.
+
+```{r}
+summary(m_2a)
+```
+
+
+Now let us plot the best model with the data.
+
+```{r, results=TRUE}
+scatter_m2a<- ggplot(IDH, aes(x=per_disturbance, y=species_richness)) +geom_point() + labs(x="Disturbance (%)", y="Species richness") + xlim(0,100) +ylim(-5,25)+ theme_bw() + stat_smooth(method = "lm", formula = y ~ -1 + x + I(x^2),se = FALSE)
+
+scatter_m2a
+```
+Take home: This is the end of our regression work.  There are many other opportunities to consider going forward.  Consider Time Series Analysis using package `forecast` and random effect linear models using package `lme4`. However, you now have the tools to evaluate many simple and multivariate regression models and some limited non-linear modeling.  GO! GO! GO!
+
+### Dates with `lubridate`
+ 
+Dealing with date can be messy.  Maybe your tidy data is separated into variables that clearly delineate the Month, Day, Year,  Hour, Minute, Second, and Time Zone it was recorded in.  Chances are not.  Further, your data will often be read by R as character or string.  Yet, there are numeric values you would like to pull out.  Here we provide some examples of how to deal with problematic data using the package `lubridate`.   
+
+Here is the cheat sheet for `lubridate` [here](https://rawgit.com/rstudio/cheatsheets/main/lubridate.pdf)
+
+Commonly date-times come in the form:
+```{r include=TRUE, results=TRUE}
+dt<-"2022-11-21 12:30:05 UTC"  #this is a string
+
+is.numeric(dt)
+```
+
+How do we access the information within the string?
+
+```{r include=TRUE, results=TRUE}
+#First define the structure of the string
+# year month day _ hour minute second 
+dt_mod<-ymd_hms(dt) # look over at the values pane. The "" are removed!
+
+
+#Now you can extact and manipulate the dates
+#Extract the year
+year(dt_mod)
+
+#Extract the day
+day(dt_mod)
+  
+#Extract the month
+month(dt_mod)
+
+#Extract the hour
+hour(dt_mod)
+
+#Extract the minute
+minute(dt_mod)
+
+#Extract the second
+second(dt_mod)
+
+#Translate to decimal date
+decimal_date(dt_mod)
+```
+
+### Example: Sedgwick bird biodiversity using eBIRD
+
+Here are the observed and estimated bird species richness for 2021 at Sedgwick Natural Reserve
+
+```{r}
+birds_2021<- read_csv(here("data","Sedgwick_2021_ebird_obs_mod.csv"))
+```
+
+If you look at the data file, you'll see taht data is a character in the form of "mm/dd/yy" and will be difficult to plot.  However we can `lubridate`!
+
+
+This code will change date from a character to Date
+```{r}
+birds_2021$date<-mdy(birds_2021$date)
+#notice the data set now has date as a Date identified!
+```
+
+
+This code will make the decimal date from the date, which is easy to plot
+```{r }
+birds_2021$ddate<-decimal_date(birds_2021$date)
+#notice the ddata is a numeric! This is easy to plot
+```
+
+Plot the data
+```{r include=TRUE, results=TRUE}
+ts_sedgwick_birds<- ggplot(birds_2021, aes(x=ddate, y=s_obs)) +geom_point() +
+  labs(x="Decimal date (2021)", y="Observed species richness")  +ylim(0,200)+ theme_bw()
+
+ts_sedgwick_birds
+```
+
